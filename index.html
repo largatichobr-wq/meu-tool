@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enviar Foto</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background-color: #f4f4f9;
+    }
+
+    .card {
+      background: white;
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      text-align: center;
+      max-width: 350px;
+      width: 90%;
+    }
+
+    #drop-zone {
+      border: 2px dashed #4CAF50;
+      border-radius: 10px;
+      padding: 30px 10px;
+      color: #555;
+      background-color: #f9f9f9;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-bottom: 15px;
+    }
+
+    #drop-zone.dragover {
+      background-color: #e8f5e9;
+      border-color: #2e7d32;
+    }
+
+    .divider {
+      margin: 15px 0;
+      color: #888;
+      font-size: 14px;
+    }
+
+    /* Esconde o input padrão do navegador para usarmos um botão bonitinho */
+    #file-input {
+      display: none;
+    }
+
+    .btn-upload {
+      display: inline-block;
+      background-color: #4CAF50;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.3s;
+    }
+
+    .btn-upload:hover {
+      background-color: #45a049;
+    }
+
+    #status {
+      margin-top: 15px;
+      font-weight: bold;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h2>Enviar Foto</h2>
+    
+    <div id="drop-zone">
+      📷 Arraste e solte sua foto aqui
+    </div>
+
+    <div class="divider">ou no celular</div>
+
+    <label for="file-input" class="btn-upload">
+      📁 Selecionar Foto
+    </label>
+    <input type="file" id="file-input" accept="image/*">
+
+    <div id="status"></div>
+  </div>
+
+  <script>
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const statusText = document.getElementById('status');
+
+    // 1. Evento para o Botão (Clique / Celular)
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        processarArquivo(e.target.files[0]);
+      }
+    });
+
+    // 2. Eventos para Arrastar e Soltar (Drag & Drop / PC)
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      if (e.dataTransfer.files.length > 0) {
+        processarArquivo(e.dataTransfer.files[0]);
+      }
+    });
+
+    // Função que valida e envia o arquivo
+    function processarArquivo(file) {
+      if (!file.type.startsWith('image/')) {
+        statusText.style.color = 'red';
+        statusText.innerText = 'Por favor, selecione apenas imagens!';
+        return;
+      }
+
+      statusText.style.color = '#555';
+      statusText.innerText = 'Enviando...';
+      enviarFoto(file);
+    }
+
+    // Envio via Fetch para o Node.js
+    function enviarFoto(file) {
+      const formData = new FormData();
+      formData.append('foto', file);
+
+      fetch('https://meu-servidor-jst6.onrender.com', {
+        method: 'POST',
+        body: formData
+      })
+      .then(res => res.json())
+      .then(data => {
+        statusText.style.color = 'green';
+        statusText.innerText = '✅ ' + data.mensagem;
+      })
+      .catch(err => {
+        console.error(err);
+        statusText.style.color = 'red';
+        statusText.innerText = '❌ Erro ao enviar foto.';
+      });
+    }
+  </script>
+
+</body>
+</html>
