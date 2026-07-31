@@ -71,6 +71,7 @@
       margin-top: 15px;
       font-weight: bold;
       word-break: break-all;
+      line-height: 1.4;
     }
   </style>
 </head>
@@ -97,6 +98,7 @@
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file-input');
     const statusText = document.getElementById('status');
+    const SERVER_URL = 'https://meu-servidor-jst6.onrender.com';
 
     // 1. Evento para o Botão (Clique / Celular)
     fileInput.addEventListener('change', (e) => {
@@ -123,8 +125,8 @@
       }
     });
 
-    // Função que valida e envia o arquivo
-    function processarArquivo(file) {
+    // Função que valida e inicia o processo
+    async function processarArquivo(file) {
       if (!file.type.startsWith('image/')) {
         statusText.style.color = 'red';
         statusText.innerText = 'Por favor, selecione apenas imagens!';
@@ -132,29 +134,60 @@
       }
 
       statusText.style.color = '#555';
-      statusText.innerText = 'Enviando...';
-      enviarFoto(file);
+      statusText.innerText = '⏳ Conectando ao servidor...';
+
+      // Envia a foto com tolerância para o Render ligar
+      await enviarFotoComRetry(file);
     }
 
-    // Envio via Fetch para o Node.js
-    function enviarFoto(file) {
+    // Função com tempo estendido e suporte a "servidor dormindo"
+    async function enviarFotoComRetry(file, tentativas = 3) {
       const formData = new FormData();
       formData.append('foto', file);
 
-      fetch('https://meu-servidor-jst6.onrender.com', {
-        method: 'POST',
-        body: formData
-      })
-      .then(res => res.json())
-      .then(data => {
-        statusText.style.color = 'green';
-        statusText.innerText = '✅ ' + data.mensagem;
-      })
-      .catch(err => {
-        console.error(err);
-        statusText.style.color = 'red';
-        statusText.innerText = '❌ Erro ao enviar foto.';
-      });
+      for (let i = 1; i <= tentativas; i++) {
+        try {
+          if (i > 1) {
+            statusText.style.color = '#e67e22';
+            statusText.innerText = `⏳ Acordando o servidor Render... (Tentativa ${i}/${tentativas})\nIsso pode levar até 1 minuto.`;
+          } else {
+            statusText.innerText = 'Enviando...';
+          }
+
+          // AbortController define um tempo limite personalizado (2 minutos / 120s)
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 120000); 
+
+          const res = await fetch(`${SERVER_URL}/upload`, {
+            method: 'POST',
+            body: formData,
+            signal: controller.signal
+          });
+
+          clearTimeout(timeoutId);
+
+          if (!res.ok) {
+            throw new Error(`Erro do servidor: ${res.status}`);
+          }
+
+          const data = await res.json();
+          statusText.style.color = 'green';
+          statusText.innerText = '✅ ' + (data.mensagem || 'Foto enviada com sucesso!');
+          return; // Sucesso, encerra a função
+
+        } catch (err) {
+          console.warn(`Tentativa ${i} falhou:`, err);
+          
+          // Se esgotaram as tentativas, mostra mensagem de erro
+          if (i === tentativas) {
+            statusText.style.color = 'red';
+            statusText.innerText = '❌ Não foi possível conectar ao servidor. Tente novamente em alguns segundos.';
+          } else {
+            // Aguarda 5 segundos antes de tentar novamente enquanto o Render acorda
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          }
+        }
+      }
     }
   </script>
 
